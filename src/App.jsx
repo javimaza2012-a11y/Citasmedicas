@@ -843,7 +843,7 @@ function App() {
                       const dateObj = new Date(app.date + 'T00:00:00');
                       const dayName = dateObj.toLocaleDateString('es-ES', { weekday: 'long' });
                       const dayNum = dateObj.getDate();
-                      const monthName = dateObj.toLocaleDateString('es-ES', { month: 'short' });
+                      const monthName = dateObj.toLocaleDateString('es-ES', { month: 'long' });
                       
                       // Agrupar por mes en el listado
                       const showMonthHeader = index === 0 || 
@@ -853,7 +853,10 @@ function App() {
                         <React.Fragment key={app.id}>
                           {showMonthHeader && (
                             <div className="date-divider">
-                              {dateObj.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                              {(() => {
+                                const str = dateObj.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+                                return str.charAt(0).toUpperCase() + str.slice(1);
+                              })()}
                             </div>
                           )}
                           <div 
@@ -905,8 +908,8 @@ function App() {
                             <div className="appointment-info-grid">
                               <div className="info-item highlight">
                                 <Clock size={18} />
-                                <span style={{ textTransform: 'capitalize' }}>
-                                  {dayName} {dayNum} de {monthName} {app.time ? `a las ${app.time}` : ''}
+                                <span>
+                                  {dayName.charAt(0).toUpperCase() + dayName.slice(1)} {dayNum} de {monthName}{app.time ? ` a las ${app.time}` : ''}
                                 </span>
                               </div>
                               
