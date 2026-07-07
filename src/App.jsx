@@ -18,7 +18,8 @@ import {
   Image as ImageIcon,
   Check,
   Eye,
-  EyeOff
+  EyeOff,
+  Bell
 } from 'lucide-react';
 import { api } from './services/api';
 
@@ -114,6 +115,7 @@ function App() {
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [formAppointment, setFormAppointment] = useState({
     title: '',
+    type: 'cita',
     patientId: '',
     doctor: '',
     date: '',
@@ -378,6 +380,7 @@ function App() {
     setEditingAppointment(appointment);
     setFormAppointment({
       title: appointment.title,
+      type: appointment.type || 'cita',
       patientId: appointment.patientId,
       doctor: appointment.doctor,
       date: appointment.date,
@@ -441,6 +444,7 @@ function App() {
     setEditingAppointment(null);
     setFormAppointment({
       title: '',
+      type: 'cita',
       patientId: patients.length > 0 ? patients[0].id : '',
       doctor: '',
       date: '',
@@ -806,13 +810,27 @@ function App() {
                               {dateObj.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
                             </div>
                           )}
-                          <div className="appointment-card" style={{ '--patient-color': patient.color }}>
+                          <div 
+                            className="appointment-card" 
+                            style={{ 
+                              '--patient-color': patient.color,
+                              borderStyle: app.type === 'recordatorio' ? 'dashed' : 'solid',
+                              borderWidth: '1px',
+                              borderColor: 'var(--border)',
+                              borderLeft: app.type === 'recordatorio' ? '6px dashed var(--patient-color)' : '6px solid var(--patient-color)',
+                              backgroundColor: app.type === 'recordatorio' ? '#fafafb' : 'white'
+                            }}
+                          >
                             <div className="appointment-card-header">
                               <div>
-                                <span className="appointment-badge" style={{ backgroundColor: patient.color }}>
-                                  {patient.name} ({patient.relation})
+                                <span className="appointment-badge" style={{ backgroundColor: patient.color, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  {app.type === 'recordatorio' ? <Bell size={12} /> : null}
+                                  {patient.name} ({app.type === 'recordatorio' ? 'Recordatorio' : patient.relation})
                                 </span>
-                                <h3 className="appointment-title">{app.title}</h3>
+                                <h3 className="appointment-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  {app.type === 'recordatorio' && <Bell size={18} style={{ color: 'var(--primary)' }} />}
+                                  {app.title}
+                                </h3>
                               </div>
                               
                               {/* Cargar adjunto rápidamente */}
@@ -934,11 +952,16 @@ function App() {
                           <div className="calendar-day-indicators">
                             {dayApps.slice(0, 3).map(app => {
                               const p = getPatientInfo(app.patientId);
+                              const isReminder = app.type === 'recordatorio';
                               return (
                                 <span 
                                   key={app.id} 
                                   className="day-dot" 
-                                  style={{ backgroundColor: p.color }}
+                                  style={{ 
+                                    backgroundColor: isReminder ? 'transparent' : p.color,
+                                    border: isReminder ? `1.5px solid ${p.color}` : 'none',
+                                    boxSizing: 'border-box'
+                                  }}
                                 ></span>
                               );
                             })}
@@ -970,15 +993,24 @@ function App() {
                             style={{ 
                               '--patient-color': patient.color,
                               padding: '14px 16px',
-                              borderRadius: '16px'
+                              borderRadius: '16px',
+                              borderStyle: app.type === 'recordatorio' ? 'dashed' : 'solid',
+                              borderWidth: '1px',
+                              borderColor: 'var(--border)',
+                              borderLeft: app.type === 'recordatorio' ? '6px dashed var(--patient-color)' : '6px solid var(--patient-color)',
+                              backgroundColor: app.type === 'recordatorio' ? '#fafafb' : 'white'
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div>
-                                <span className="appointment-badge" style={{ backgroundColor: patient.color, fontSize: '0.7rem' }}>
-                                  {patient.name}
+                                <span className="appointment-badge" style={{ backgroundColor: patient.color, fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  {app.type === 'recordatorio' ? <Bell size={10} /> : null}
+                                  {patient.name} ({app.type === 'recordatorio' ? 'Recordatorio' : patient.relation})
                                 </span>
-                                <h4 style={{ margin: '4px 0 0 0', fontSize: '1rem', fontWeight: 700 }}>{app.title}</h4>
+                                <h4 style={{ margin: '4px 0 0 0', fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {app.type === 'recordatorio' && <Bell size={14} style={{ color: 'var(--primary)' }} />}
+                                  {app.title}
+                                </h4>
                               </div>
                               {app.imageUrl && (
                                 <button className="attachment-preview-button" onClick={() => setLightboxImage(app.imageUrl)} style={{ padding: '6px 10px', fontSize: '0.75rem' }}>
@@ -1018,12 +1050,27 @@ function App() {
 
                 <form onSubmit={handleSaveAppointment} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   
+                  {/* Tipo de Evento */}
+                  <div className="form-group">
+                    <label className="form-label">Tipo de Evento</label>
+                    <select
+                      value={formAppointment.type || 'cita'}
+                      onChange={e => setFormAppointment(prev => ({ ...prev, type: e.target.value }))}
+                      className="form-input form-select"
+                    >
+                      <option value="cita">🩺 Cita Médica (Consulta, Análisis, etc.)</option>
+                      <option value="recordatorio">🔔 Recordatorio (Pedir cita, comprar pastillas, etc.)</option>
+                    </select>
+                  </div>
+
                   {/* Título de la cita */}
                   <div className="form-group">
-                    <label className="form-label">Especialidad / Tipo de Cita *</label>
+                    <label className="form-label">
+                      {formAppointment.type === 'recordatorio' ? '¿Qué hay que recordar? *' : 'Especialidad / Tipo de Cita *'}
+                    </label>
                     <input 
                       type="text" 
-                      placeholder="Ej. Oftalmólogo, Dentista, Análisis de sangre"
+                      placeholder={formAppointment.type === 'recordatorio' ? 'Ej. Pedir cita para hacer análisis' : 'Ej. Oftalmólogo, Dentista, Análisis de sangre'}
                       value={formAppointment.title}
                       onChange={e => setFormAppointment(prev => ({ ...prev, title: e.target.value }))}
                       className="form-input"
@@ -1062,10 +1109,12 @@ function App() {
 
                   {/* Centro Médico */}
                   <div className="form-group">
-                    <label className="form-label">Centro Médico / Hospital (opcional)</label>
+                    <label className="form-label">
+                      {formAppointment.type === 'recordatorio' ? 'Ubicación / Notas de contacto (opcional)' : 'Centro Médico / Hospital (opcional)'}
+                    </label>
                     <input 
                       type="text" 
-                      placeholder="Ej. Centro de Salud El Centro, Box 4"
+                      placeholder={formAppointment.type === 'recordatorio' ? 'Ej. Llamar por teléfono o a través de la web' : 'Ej. Centro de Salud El Centro, Box 4'}
                       value={formAppointment.location}
                       onChange={e => setFormAppointment(prev => ({ ...prev, location: e.target.value }))}
                       className="form-input"
