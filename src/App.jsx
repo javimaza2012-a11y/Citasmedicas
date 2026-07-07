@@ -136,7 +136,8 @@ function App() {
     color: PALETTE_COLORS[0]
   });
 
-  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
 
   // Estados de Autenticación
   const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem('family_app_logged') === 'true');
@@ -434,9 +435,8 @@ function App() {
     } finally {
       setUploadingImage(false);
       setUploadProgress(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
     }
   };
 
@@ -454,9 +454,8 @@ function App() {
       imageUrl: null,
       imageUrls: []
     });
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
   };
 
   // ==================== LÓGICA DE PACIENTES ====================
@@ -1226,7 +1225,7 @@ function App() {
                                 fontSize: '12px',
                                 boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                               }}
-                              title="Eliminar foto"
+                                  title="Eliminar foto"
                             >
                               <X size={14} />
                             </button>
@@ -1235,11 +1234,10 @@ function App() {
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', alignItems: 'center' }}>
                       <label 
                         className="btn btn-secondary" 
                         style={{ 
-                          flexGrow: 1, 
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center', 
@@ -1247,16 +1245,43 @@ function App() {
                           minHeight: '48px', 
                           cursor: 'pointer',
                           margin: 0,
-                          fontSize: '0.9rem'
+                          fontSize: '0.85rem',
+                          padding: '8px 12px'
                         }}
                       >
-                        <Camera size={20} />
-                        <span>{formAppointment.imageUrls && formAppointment.imageUrls.length > 0 ? 'Hacer Otra Foto / Adjuntar Más' : 'Hacer Foto al Volante / Receta'}</span>
+                        <Camera size={18} />
+                        <span>Hacer Foto</span>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          capture="environment"
+                          onChange={handleImageCapture} 
+                          ref={cameraInputRef} 
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+
+                      <label 
+                        className="btn btn-secondary" 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          gap: '8px', 
+                          minHeight: '48px', 
+                          cursor: 'pointer',
+                          margin: 0,
+                          fontSize: '0.85rem',
+                          padding: '8px 12px'
+                        }}
+                      >
+                        <ImageIcon size={18} />
+                        <span>Subir de Galería</span>
                         <input 
                           type="file" 
                           accept="image/*" 
                           onChange={handleImageCapture} 
-                          ref={fileInputRef} 
+                          ref={galleryInputRef} 
                           style={{ display: 'none' }}
                           multiple
                         />
