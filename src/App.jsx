@@ -160,7 +160,7 @@ function App() {
     e.preventDefault();
     const userClean = loginUser.trim().toLowerCase();
     
-    if (userClean === 'luciano' && loginPassword === 'Luciano*1210*+-*') {
+    if (userClean === 'yolijavi' && loginPassword === 'YoliJavi*6788*') {
       localStorage.setItem('family_app_logged', 'true');
       localStorage.setItem('family_app_role', 'admin');
       setIsAuthenticated(true);
@@ -689,7 +689,7 @@ function App() {
               <label className="form-label">Usuario</label>
               <input 
                 type="text" 
-                placeholder="Ej. Luciano"
+                placeholder="Ej. YoliJavi"
                 value={loginUser}
                 onChange={e => setLoginUser(e.target.value)}
                 className="form-input"
