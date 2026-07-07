@@ -138,6 +138,12 @@ function App() {
 
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
+  const navigationStateRef = useRef({ lightboxImages: [], activeTab: 'citas', editingAppointment: null, editingPatient: null });
+
+  // Sincronizar el ref de navegación para evitar clausuras obsoletas en popstate
+  useEffect(() => {
+    navigationStateRef.current = { lightboxImages, activeTab, editingAppointment, editingPatient };
+  }, [lightboxImages, activeTab, editingAppointment, editingPatient]);
 
   // Estados de Autenticación
   const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem('family_app_logged') === 'true');
@@ -323,6 +329,46 @@ function App() {
   // Carga inicial
   useEffect(() => {
     fetchData();
+  }, []);
+
+  // Interceptar botón atrás nativo del móvil (PWA/Android back trap)
+  useEffect(() => {
+    // Empujar estado inicial para crear la trampa en el historial
+    window.history.pushState({ trap: true }, '');
+
+    const handlePopState = (e) => {
+      const { lightboxImages: images, activeTab: tab, editingAppointment: editApp, editingPatient: editPat } = navigationStateRef.current;
+
+      // 1. Si hay fotos abiertas en pantalla grande, cerrarlas
+      if (images && images.length > 0) {
+        closeLightbox();
+        window.history.pushState({ trap: true }, '');
+        return;
+      }
+
+      // 2. Si estamos editando o en una pestaña que no es la de inicio (Citas), volver a Citas
+      if (tab !== 'citas' || editApp !== null || editPat !== null) {
+        setActiveTab('citas');
+        resetAppointmentForm();
+        setEditingPatient(null);
+        window.history.pushState({ trap: true }, '');
+        return;
+      }
+
+      // 3. Si ya estamos en el inicio de la app ('citas'), preguntar antes de salir
+      if (window.confirm('¿Seguro que deseas salir de la aplicación?')) {
+        // Permitir salida yendo atrás de verdad
+        window.history.back();
+      } else {
+        // Volver a empujar el estado trampa para interceptar el siguiente atrás
+        window.history.pushState({ trap: true }, '');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
   }, []);
 
   const fetchData = async () => {
