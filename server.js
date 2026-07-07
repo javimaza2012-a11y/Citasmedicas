@@ -164,7 +164,7 @@ app.get('/api/appointments', (req, res) => {
 
 app.post('/api/appointments', (req, res) => {
   const appointments = readJsonFile(APPOINTMENTS_FILE, []);
-  const { title, patientId, doctor, date, time, location, notes, imageUrl } = req.body;
+  const { title, type, patientId, doctor, date, time, location, notes, imageUrl, imageUrls } = req.body;
 
   if (!title || !patientId || !date) {
     return res.status(400).json({ error: 'Los campos Título, Paciente y Fecha son obligatorios' });
@@ -173,13 +173,15 @@ app.post('/api/appointments', (req, res) => {
   const newAppointment = {
     id: `app-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     title,
+    type: type || 'cita',
     patientId,
     doctor: doctor || '',
     date,
     time: time || '',
     location: location || '',
     notes: notes || '',
-    imageUrl: imageUrl || null
+    imageUrl: imageUrl || null,
+    imageUrls: imageUrls || (imageUrl ? [imageUrl] : [])
   };
 
   appointments.push(newAppointment);
@@ -190,37 +192,43 @@ app.post('/api/appointments', (req, res) => {
 app.put('/api/appointments/:id', (req, res) => {
   const appointments = readJsonFile(APPOINTMENTS_FILE, []);
   const { id } = req.params;
-  const { title, patientId, doctor, date, time, location, notes, imageUrl } = req.body;
+  const { title, type, patientId, doctor, date, time, location, notes, imageUrl, imageUrls } = req.body;
 
   const appIndex = appointments.findIndex(app => app.id === id);
   if (appIndex === -1) {
     return res.status(404).json({ error: 'Cita no encontrada' });
   }
 
-  // Eliminar la imagen anterior del disco si se reemplaza o elimina
-  const oldImageUrl = appointments[appIndex].imageUrl;
-  if (oldImageUrl && imageUrl !== oldImageUrl) {
-    const oldFileName = oldImageUrl.replace('/uploads/', '');
-    const oldFilePath = path.join(UPLOADS_DIR, oldFileName);
-    if (fs.existsSync(oldFilePath)) {
+  // Eliminar del disco las imágenes que han sido removidas
+  const oldApp = appointments[appIndex];
+  const oldImages = oldApp.imageUrls || (oldApp.imageUrl ? [oldApp.imageUrl] : []);
+  const newImages = imageUrls || (imageUrl ? [imageUrl] : []);
+
+  const imagesToDelete = oldImages.filter(img => !newImages.includes(img));
+  imagesToDelete.forEach(imgUrl => {
+    const fileName = imgUrl.replace('/uploads/', '');
+    const filePath = path.join(UPLOADS_DIR, fileName);
+    if (fs.existsSync(filePath)) {
       try {
-        fs.unlinkSync(oldFilePath);
+        fs.unlinkSync(filePath);
       } catch (err) {
-        console.error('Error eliminando archivo de imagen viejo:', err);
+        console.error('Error eliminando archivo físico de imagen:', err);
       }
     }
-  }
+  });
 
   appointments[appIndex] = {
     ...appointments[appIndex],
     title: title !== undefined ? title : appointments[appIndex].title,
+    type: type !== undefined ? type : appointments[appIndex].type || 'cita',
     patientId: patientId !== undefined ? patientId : appointments[appIndex].patientId,
     doctor: doctor !== undefined ? doctor : appointments[appIndex].doctor,
     date: date !== undefined ? date : appointments[appIndex].date,
     time: time !== undefined ? time : appointments[appIndex].time,
     location: location !== undefined ? location : appointments[appIndex].location,
     notes: notes !== undefined ? notes : appointments[appIndex].notes,
-    imageUrl: imageUrl !== undefined ? imageUrl : appointments[appIndex].imageUrl
+    imageUrl: imageUrl !== undefined ? imageUrl : appointments[appIndex].imageUrl,
+    imageUrls: imageUrls !== undefined ? imageUrls : (appointments[appIndex].imageUrls || (appointments[appIndex].imageUrl ? [appointments[appIndex].imageUrl] : []))
   };
 
   writeJsonFile(APPOINTMENTS_FILE, appointments);
@@ -236,9 +244,10 @@ app.delete('/api/appointments/:id', (req, res) => {
     return res.status(404).json({ error: 'Cita no encontrada' });
   }
 
-  // Eliminar la imagen del disco asociada
-  if (appointment.imageUrl) {
-    const fileName = appointment.imageUrl.replace('/uploads/', '');
+  // Eliminar todas las imágenes del disco asociadas
+  const oldImages = appointment.imageUrls || (appointment.imageUrl ? [appointment.imageUrl] : []);
+  oldImages.forEach(imgUrl => {
+    const fileName = imgUrl.replace('/uploads/', '');
     const filePath = path.join(UPLOADS_DIR, fileName);
     if (fs.existsSync(filePath)) {
       try {
@@ -247,7 +256,7 @@ app.delete('/api/appointments/:id', (req, res) => {
         console.error('Error eliminando archivo físico de imagen:', err);
       }
     }
-  }
+  });
 
   const filteredAppointments = appointments.filter(app => app.id !== id);
   writeJsonFile(APPOINTMENTS_FILE, filteredAppointments);

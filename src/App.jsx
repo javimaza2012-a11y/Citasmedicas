@@ -105,7 +105,8 @@ function App() {
   const [activeTab, setActiveTab] = useState('citas'); // 'citas', 'calendario', 'pacientes', 'agregar'
   const [selectedPatientFilter, setSelectedPatientFilter] = useState(null);
   const [showPastAppointments, setShowPastAppointments] = useState(false);
-  const [lightboxImage, setLightboxImage] = useState(null);
+  const [lightboxImages, setLightboxImages] = useState([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   // Estado para la vista de Calendario
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -122,7 +123,8 @@ function App() {
     time: '',
     location: '',
     notes: '',
-    imageUrl: null
+    imageUrl: null,
+    imageUrls: []
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
@@ -269,7 +271,8 @@ function App() {
   };
 
   const closeLightbox = () => {
-    setLightboxImage(null);
+    setLightboxImages([]);
+    setLightboxIndex(0);
     setZoomScale(1);
     setPanX(0);
     setPanY(0);
@@ -404,39 +407,36 @@ function App() {
   };
 
   const handleImageCapture = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
 
     setUploadingImage(true);
-    setUploadProgress('Comprimiendo imagen...');
+    setUploadProgress(`Procesando ${files.length} archivo(s)...`);
     
     try {
-      // 1. Comprimir en cliente
-      const compressedFile = await compressImage(file);
-      
-      // 2. Subir al servidor
-      setUploadProgress('Subiendo al servidor...');
-      const response = await api.uploadImage(compressedFile);
+      const newUrls = [];
+      for (let i = 0; i < files.length; i++) {
+        setUploadProgress(`Comprimiendo imagen ${i + 1} de ${files.length}...`);
+        const compressedFile = await compressImage(files[i]);
+        
+        setUploadProgress(`Subiendo imagen ${i + 1} de ${files.length}...`);
+        const response = await api.uploadImage(compressedFile);
+        newUrls.push(response.imageUrl);
+      }
       
       setFormAppointment(prev => ({
         ...prev,
-        imageUrl: response.imageUrl
+        imageUrls: [...(prev.imageUrls || []), ...newUrls],
+        imageUrl: prev.imageUrl || newUrls[0]
       }));
     } catch (err) {
-      alert('Error al procesar la imagen: ' + err.message);
+      alert('Error al procesar las imágenes: ' + err.message);
     } finally {
       setUploadingImage(false);
       setUploadProgress(null);
-    }
-  };
-
-  const handleRemoveImage = () => {
-    setFormAppointment(prev => ({
-      ...prev,
-      imageUrl: null
-    }));
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -451,7 +451,8 @@ function App() {
       time: '',
       location: '',
       notes: '',
-      imageUrl: null
+      imageUrl: null,
+      imageUrls: []
     });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -833,15 +834,25 @@ function App() {
                                 </h3>
                               </div>
                               
-                              {/* Cargar adjunto rápidamente */}
-                              {app.imageUrl && (
+                              {/* Cargar adjuntos rápidamente */}
+                              {((app.imageUrls && app.imageUrls.length > 0) || app.imageUrl) && (
                                 <button 
                                   className="attachment-preview-button" 
-                                  onClick={() => setLightboxImage(app.imageUrl)}
-                                  title="Ver documento adjunto"
+                                  onClick={() => {
+                                    const images = app.imageUrls && app.imageUrls.length > 0 
+                                      ? app.imageUrls 
+                                      : [app.imageUrl];
+                                    setLightboxImages(images);
+                                    setLightboxIndex(0);
+                                  }}
+                                  title="Ver documentación adjunta"
                                 >
                                   <Camera size={16} />
-                                  <span>Documento</span>
+                                  <span>
+                                    {app.imageUrls && app.imageUrls.length > 1 
+                                      ? `Docs (${app.imageUrls.length})` 
+                                      : 'Documento'}
+                                  </span>
                                 </button>
                               )}
                             </div>
@@ -1012,10 +1023,24 @@ function App() {
                                   {app.title}
                                 </h4>
                               </div>
-                              {app.imageUrl && (
-                                <button className="attachment-preview-button" onClick={() => setLightboxImage(app.imageUrl)} style={{ padding: '6px 10px', fontSize: '0.75rem' }}>
+                              {((app.imageUrls && app.imageUrls.length > 0) || app.imageUrl) && (
+                                <button 
+                                  className="attachment-preview-button" 
+                                  onClick={() => {
+                                    const images = app.imageUrls && app.imageUrls.length > 0 
+                                      ? app.imageUrls 
+                                      : [app.imageUrl];
+                                    setLightboxImages(images);
+                                    setLightboxIndex(0);
+                                  }} 
+                                  style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                                >
                                   <Camera size={14} />
-                                  <span>Ver Doc</span>
+                                  <span>
+                                    {app.imageUrls && app.imageUrls.length > 1 
+                                      ? `Docs (${app.imageUrls.length})` 
+                                      : 'Ver Doc'}
+                                  </span>
                                 </button>
                               )}
                             </div>
@@ -1159,44 +1184,89 @@ function App() {
 
                   {/* Scanner / Captura de Volante */}
                   <div className="form-group">
-                    <label className="form-label">Escanear / Adjuntar Documento (Foto)</label>
+                    <label className="form-label">Escanear / Adjuntar Documentos (Fotos)</label>
                     
-                    {!formAppointment.imageUrl ? (
-                      <div className="scanner-container">
+                    {/* Lista de imágenes ya añadidas */}
+                    {formAppointment.imageUrls && formAppointment.imageUrls.length > 0 && (
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', 
+                        gap: '10px', 
+                        marginBottom: '12px' 
+                      }}>
+                        {formAppointment.imageUrls.map((url, idx) => (
+                          <div key={idx} style={{ position: 'relative', aspectRatio: '1', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                            <img src={url} alt={`Doc ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormAppointment(prev => {
+                                  const updatedUrls = prev.imageUrls.filter((_, i) => i !== idx);
+                                  return {
+                                    ...prev,
+                                    imageUrls: updatedUrls,
+                                    imageUrl: updatedUrls.length > 0 ? updatedUrls[0] : null
+                                  };
+                                });
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: '4px',
+                                right: '4px',
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '50%',
+                                backgroundColor: 'rgba(239, 68, 68, 0.95)',
+                                color: 'white',
+                                border: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                              }}
+                              title="Eliminar foto"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <label 
+                        className="btn btn-secondary" 
+                        style={{ 
+                          flexGrow: 1, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          gap: '8px', 
+                          minHeight: '48px', 
+                          cursor: 'pointer',
+                          margin: 0,
+                          fontSize: '0.9rem'
+                        }}
+                      >
+                        <Camera size={20} />
+                        <span>{formAppointment.imageUrls && formAppointment.imageUrls.length > 0 ? 'Hacer Otra Foto / Adjuntar Más' : 'Hacer Foto al Volante / Receta'}</span>
                         <input 
                           type="file" 
                           accept="image/*" 
-                          capture="environment" // Habilita la cámara trasera nativa en móviles
-                          onChange={handleImageCapture}
-                          className="scanner-input"
-                          ref={fileInputRef}
-                          disabled={uploadingImage}
+                          onChange={handleImageCapture} 
+                          ref={fileInputRef} 
+                          style={{ display: 'none' }}
+                          multiple
                         />
-                        <div className="scanner-content">
-                          <Camera size={36} />
-                          <strong>
-                            {uploadingImage ? 'Procesando...' : 'Hacer Foto al Volante / Receta'}
-                          </strong>
-                          <span style={{ fontSize: '0.85rem' }}>
-                            {uploadProgress || 'Usa la cámara del móvil o selecciona un archivo'}
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="scanner-preview-wrapper">
-                        <img 
-                          src={formAppointment.imageUrl} 
-                          alt="Previsualización de documento" 
-                          className="scanner-preview" 
-                        />
-                        <button 
-                          type="button" 
-                          className="remove-image-btn" 
-                          onClick={handleRemoveImage}
-                          title="Eliminar foto"
-                        >
-                          <X size={18} />
-                        </button>
+                      </label>
+                    </div>
+
+                    {uploadingImage && (
+                      <div className="progress-bar" style={{ marginTop: '8px', height: '16px', borderRadius: '8px', backgroundColor: 'var(--bg-primary)', overflow: 'hidden', position: 'relative' }}>
+                        <div className="progress-bar-fill" style={{ width: '100%', height: '100%', backgroundColor: 'var(--primary)', opacity: 0.6, animation: 'pulse 1.5s infinite' }}></div>
+                        <span style={{ position: 'absolute', width: '100%', textAlign: 'center', left: 0, top: 0, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)', lineHeight: '16px' }}>{uploadProgress}</span>
                       </div>
                     )}
                   </div>
@@ -1437,7 +1507,8 @@ function App() {
       </nav>
 
       {/* Modal Lightbox para Ampliar Documentos Adjuntos */}
-      {lightboxImage && (
+      {/* Modal Lightbox para Ampliar Documentos Adjuntos */}
+      {lightboxImages.length > 0 && (
         <div className="lightbox-backdrop" onClick={closeLightbox}>
           <button 
             className="lightbox-close" 
@@ -1446,6 +1517,23 @@ function App() {
           >
             <X size={24} />
           </button>
+
+          {/* Indicador de Páginas */}
+          {lightboxImages.length > 1 && (
+            <div style={{
+              position: 'absolute',
+              top: '20px',
+              backgroundColor: 'rgba(15, 23, 42, 0.75)',
+              color: 'white',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              fontSize: '0.85rem',
+              fontWeight: '600',
+              zIndex: 1100
+            }}>
+              Documento {lightboxIndex + 1} de {lightboxImages.length}
+            </div>
+          )}
 
           {/* Controles de Zoom */}
           <div 
@@ -1498,8 +1586,68 @@ function App() {
             }}
             onClick={e => e.stopPropagation()}
           >
+            {/* Navegación del Carrusel (Izquierda/Derecha) */}
+            {lightboxImages.length > 1 && (
+              <>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxIndex(prev => (prev - 1 + lightboxImages.length) % lightboxImages.length);
+                    setZoomScale(1);
+                    setPanX(0);
+                    setPanY(0);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    backgroundColor: 'rgba(30, 41, 59, 0.85)',
+                    color: 'white',
+                    border: 'none',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    zIndex: 1200
+                  }}
+                  aria-label="Anterior documento"
+                >
+                  <ChevronLeft size={22} />
+                </button>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxIndex(prev => (prev + 1) % lightboxImages.length);
+                    setZoomScale(1);
+                    setPanX(0);
+                    setPanY(0);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    backgroundColor: 'rgba(30, 41, 59, 0.85)',
+                    color: 'white',
+                    border: 'none',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    zIndex: 1200
+                  }}
+                  aria-label="Siguiente documento"
+                >
+                  <ChevronRight size={22} />
+                </button>
+              </>
+            )}
+
             <img 
-              src={lightboxImage} 
+              src={lightboxImages[lightboxIndex]} 
               alt="Documentación Médica Ampliada" 
               style={{
                 width: '100%',
@@ -1521,14 +1669,14 @@ function App() {
           </div>
 
           <a 
-            href={lightboxImage} 
+            href={lightboxImages[lightboxIndex]} 
             download={`documento-medico-${Date.now()}`}
             className="lightbox-download"
             onClick={e => e.stopPropagation()}
             style={{ marginTop: '16px' }}
           >
             <Download size={18} />
-            <span>Guardar Foto</span>
+            <span>Guardar Foto Actual</span>
           </a>
         </div>
       )}
