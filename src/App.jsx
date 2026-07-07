@@ -141,6 +141,8 @@ function App() {
   const [loginError, setLoginError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -163,24 +165,112 @@ function App() {
     }
   };
 
+  const touchStartRef = useRef({
+    distance: 0,
+    zoom: 1,
+    x: 0,
+    y: 0,
+    panX: 0,
+    panY: 0,
+    isPinching: false,
+    isPanning: false
+  });
+
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      // Pinch zoom start
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      touchStartRef.current = {
+        ...touchStartRef.current,
+        distance: dist,
+        zoom: zoomScale,
+        isPinching: true,
+        isPanning: false
+      };
+    } else if (e.touches.length === 1) {
+      // Pan drag start
+      touchStartRef.current = {
+        ...touchStartRef.current,
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        panX: panX,
+        panY: panY,
+        isPanning: zoomScale > 1, // Only drag if zoomed
+        isPinching: false
+      };
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (e.touches.length === 2 && touchStartRef.current.isPinching) {
+      e.preventDefault(); // Prevent body scroll
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const factor = dist / touchStartRef.current.distance;
+      const newScale = Math.max(1, Math.min(touchStartRef.current.zoom * factor, 4));
+      setZoomScale(newScale);
+      if (newScale === 1) {
+        setPanX(0);
+        setPanY(0);
+      }
+    } else if (e.touches.length === 1 && touchStartRef.current.isPanning) {
+      e.preventDefault(); // Prevent native scroll
+      const deltaX = e.touches[0].clientX - touchStartRef.current.x;
+      const deltaY = e.touches[0].clientY - touchStartRef.current.y;
+      setPanX(touchStartRef.current.panX + deltaX);
+      setPanY(touchStartRef.current.panY + deltaY);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchStartRef.current.isPinching = false;
+    touchStartRef.current.isPanning = false;
+  };
+
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const zoomFactor = 0.15;
+    let newScale = zoomScale + (e.deltaY < 0 ? zoomFactor : -zoomFactor);
+    newScale = Math.max(1, Math.min(newScale, 4));
+    setZoomScale(newScale);
+    if (newScale === 1) {
+      setPanX(0);
+      setPanY(0);
+    }
+  };
+
   const handleZoomIn = (e) => {
     e.stopPropagation();
-    setZoomScale(prev => Math.min(prev + 0.5, 3));
+    setZoomScale(prev => Math.min(prev + 0.5, 4));
   };
 
   const handleZoomOut = (e) => {
     e.stopPropagation();
-    setZoomScale(prev => Math.max(prev - 0.5, 1));
+    const newScale = Math.max(zoomScale - 0.5, 1);
+    setZoomScale(newScale);
+    if (newScale === 1) {
+      setPanX(0);
+      setPanY(0);
+    }
   };
 
   const handleZoomReset = (e) => {
     e.stopPropagation();
     setZoomScale(1);
+    setPanX(0);
+    setPanY(0);
   };
 
   const closeLightbox = () => {
     setLightboxImage(null);
     setZoomScale(1);
+    setPanX(0);
+    setPanY(0);
   };
 
   const handleExportBackup = async () => {
@@ -1336,7 +1426,7 @@ function App() {
             <button 
               className="btn btn-secondary" 
               onClick={handleZoomIn}
-              disabled={zoomScale >= 3}
+              disabled={zoomScale >= 4}
               style={{ minHeight: '44px', minWidth: '44px', padding: '0 16px', fontSize: '1.2rem', fontWeight: 'bold' }}
             >
               +
@@ -1348,13 +1438,14 @@ function App() {
             style={{
               maxWidth: '100%',
               maxHeight: '65vh',
-              overflow: 'auto',
               width: '100%',
+              overflow: 'hidden',
               borderRadius: '12px',
-              backgroundColor: '#1e293b',
+              backgroundColor: '#192231',
               display: 'flex',
-              justifyContent: zoomScale === 1 ? 'center' : 'flex-start',
-              alignItems: zoomScale === 1 ? 'center' : 'flex-start',
+              justifyContent: 'center',
+              alignItems: 'center',
+              position: 'relative',
             }}
             onClick={e => e.stopPropagation()}
           >
@@ -1362,14 +1453,21 @@ function App() {
               src={lightboxImage} 
               alt="Documentación Médica Ampliada" 
               style={{
-                width: `${100 * zoomScale}%`,
-                maxWidth: zoomScale === 1 ? '100%' : 'none',
-                height: 'auto',
-                maxHeight: zoomScale === 1 ? '65vh' : 'none',
+                width: '100%',
+                maxHeight: '65vh',
                 objectFit: 'contain',
                 display: 'block',
-                transition: 'width 0.2s ease, max-height 0.2s ease',
+                transform: `translate(${panX}px, ${panY}px) scale(${zoomScale})`,
+                transformOrigin: 'center center',
+                touchAction: 'none',
+                transition: touchStartRef.current.isPinching || touchStartRef.current.isPanning ? 'none' : 'transform 0.2s ease',
+                cursor: zoomScale > 1 ? 'grab' : 'default',
               }}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onWheel={handleWheel}
+              onClick={e => e.stopPropagation()}
             />
           </div>
 
