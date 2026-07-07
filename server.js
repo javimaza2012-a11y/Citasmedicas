@@ -16,8 +16,8 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' })); // Permitir JSON grandes para imágenes optimizadas
 app.use(express.urlencoded({ extended: true }));
 
-// Directorios de datos
-const DATA_DIR = path.join(__dirname, 'data');
+// Directorios de datos (soporte para disco persistente en Render)
+const DATA_DIR = process.env.DATA_DIR || (fs.existsSync('/data') && process.platform !== 'win32' ? '/data' : path.join(__dirname, 'data'));
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const PATIENTS_FILE = path.join(DATA_DIR, 'patients.json');
 const APPOINTMENTS_FILE = path.join(DATA_DIR, 'appointments.json');
