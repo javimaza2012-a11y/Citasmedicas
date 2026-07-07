@@ -23,6 +23,14 @@ import {
 } from 'lucide-react';
 import { api } from './services/api';
 
+// Helper para formatear fechas locales a YYYY-MM-DD sin desvíos de zona horaria
+const formatDateLocal = (date) => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 // Función para comprimir la imagen en el cliente
 const compressImage = (file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) => {
   return new Promise((resolve, reject) => {
@@ -110,7 +118,7 @@ function App() {
 
   // Estado para la vista de Calendario
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDateStr, setSelectedDateStr] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDateStr, setSelectedDateStr] = useState(formatDateLocal(new Date()));
 
   // Estados para formularios
   const [editingAppointment, setEditingAppointment] = useState(null);
@@ -309,7 +317,7 @@ function App() {
       )}`;
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute('href', jsonString);
-      downloadAnchor.setAttribute('download', `copia-seguridad-citas-${new Date().toISOString().split('T')[0]}.json`);
+      downloadAnchor.setAttribute('download', `copia-seguridad-citas-${formatDateLocal(new Date())}.json`);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
@@ -589,7 +597,7 @@ function App() {
       days.push({
         date: prevDate,
         isCurrentMonth: false,
-        str: prevDate.toISOString().split('T')[0]
+        str: formatDateLocal(prevDate)
       });
     }
 
@@ -599,7 +607,7 @@ function App() {
       days.push({
         date: currDate,
         isCurrentMonth: true,
-        str: currDate.toISOString().split('T')[0]
+        str: formatDateLocal(currDate)
       });
     }
 
@@ -611,7 +619,7 @@ function App() {
       days.push({
         date: nextDate,
         isCurrentMonth: false,
-        str: nextDate.toISOString().split('T')[0]
+        str: formatDateLocal(nextDate)
       });
     }
 
@@ -633,7 +641,7 @@ function App() {
   // ==================== RENDERIZADO DE VISTAS ====================
 
   // Filtrado de citas del Dashboard
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = formatDateLocal(new Date());
   
   const filteredAppointments = appointments
     .filter(app => {
@@ -1018,12 +1026,30 @@ function App() {
                       const dayApps = getAppointmentsForDate(day.str);
                       const isSelected = selectedDateStr === day.str;
                       const isToday = day.str === todayStr;
+                      const hasEvents = dayApps.length > 0;
 
                       return (
                         <button
                           key={idx}
                           className={`calendar-day ${!day.isCurrentMonth ? 'other-month' : ''} ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
                           onClick={() => setSelectedDateStr(day.str)}
+                          style={{
+                            backgroundColor: isSelected 
+                              ? 'var(--primary-light)' 
+                              : isToday 
+                              ? 'var(--bg-primary)' 
+                              : hasEvents 
+                              ? '#f0f4f9' // Soft background tint for days with appointments
+                              : 'transparent',
+                            border: isSelected 
+                              ? '2px solid var(--primary)' 
+                              : isToday 
+                              ? '2px solid var(--text-light)' 
+                              : hasEvents 
+                              ? '1px solid #dbeafe' // Soft border to stand out
+                              : 'none',
+                            fontWeight: hasEvents ? '800' : '600'
+                          }}
                         >
                           <span style={{ fontSize: '0.95rem' }}>{day.date.getDate()}</span>
                           <div className="calendar-day-indicators">
@@ -1033,12 +1059,13 @@ function App() {
                               return (
                                 <span 
                                   key={app.id} 
-                                  className="day-dot" 
+                                  className="day-pill" 
                                   style={{ 
                                     backgroundColor: isReminder ? 'transparent' : p.color,
-                                    border: isReminder ? `1.5px solid ${p.color}` : 'none',
+                                    border: isReminder ? `2px solid ${p.color}` : 'none',
                                     boxSizing: 'border-box'
                                   }}
+                                  title={app.title}
                                 ></span>
                               );
                             })}
