@@ -265,6 +265,27 @@ app.post('/api/upload', upload.single('document'), (req, res) => {
   res.json({ imageUrl });
 });
 
+// --- Copias de Seguridad ---
+app.get('/api/backup/export', (req, res) => {
+  const appointments = readJsonFile(APPOINTMENTS_FILE, []);
+  const patients = readJsonFile(PATIENTS_FILE, DEFAULT_PATIENTS);
+  res.json({ appointments, patients, version: 1, date: new Date().toISOString() });
+});
+
+app.post('/api/backup/import', (req, res) => {
+  const { appointments, patients } = req.body;
+  
+  if (!Array.isArray(appointments) || !Array.isArray(patients)) {
+    return res.status(400).json({ error: 'El formato de la copia de seguridad no es válido.' });
+  }
+
+  // Guardar datos e inicializar
+  writeJsonFile(APPOINTMENTS_FILE, appointments);
+  writeJsonFile(PATIENTS_FILE, patients);
+  
+  res.json({ success: true, message: 'Copia de seguridad restaurada correctamente' });
+});
+
 // =======================================================
 
 // Servir la aplicación React compilada en producción

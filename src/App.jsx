@@ -140,6 +140,7 @@ function App() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [zoomScale, setZoomScale] = useState(1);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -160,6 +161,67 @@ function App() {
       setLoginPassword('');
       setShowPassword(false);
     }
+  };
+
+  const handleZoomIn = (e) => {
+    e.stopPropagation();
+    setZoomScale(prev => Math.min(prev + 0.5, 3));
+  };
+
+  const handleZoomOut = (e) => {
+    e.stopPropagation();
+    setZoomScale(prev => Math.max(prev - 0.5, 1));
+  };
+
+  const handleZoomReset = (e) => {
+    e.stopPropagation();
+    setZoomScale(1);
+  };
+
+  const closeLightbox = () => {
+    setLightboxImage(null);
+    setZoomScale(1);
+  };
+
+  const handleExportBackup = async () => {
+    try {
+      const data = await api.exportBackup();
+      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+        JSON.stringify(data, null, 2)
+      )}`;
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', jsonString);
+      downloadAnchor.setAttribute('download', `copia-seguridad-citas-${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (err) {
+      alert('Error al exportar la copia de seguridad: ' + err.message);
+    }
+  };
+
+  const handleImportBackup = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!window.confirm('¿Seguro que deseas restaurar esta copia de seguridad? Esto reemplazará todas las citas y familiares actuales por los del archivo.')) {
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const backupData = JSON.parse(event.target.result);
+        await api.importBackup(backupData);
+        alert('Copia de seguridad restaurada correctamente.');
+        await fetchData();
+      } catch (err) {
+        alert('Error al importar la copia de seguridad: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   // Carga inicial
@@ -1137,6 +1199,55 @@ function App() {
                   ))}
                 </div>
 
+                {/* Copia de Seguridad */}
+                <div style={{ 
+                  backgroundColor: 'var(--bg-primary)', 
+                  padding: '20px', 
+                  borderRadius: '20px', 
+                  marginTop: '24px', 
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>
+                    Copia de Seguridad
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-light)', margin: 0 }}>
+                    Descarga una copia de todas las citas y familiares en tu dispositivo para guardarla, o restáurala si has cambiado de móvil.
+                  </p>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
+                    <button 
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleExportBackup}
+                      style={{ minHeight: '44px', padding: '8px 12px', fontSize: '0.85rem' }}
+                    >
+                      Exportar Datos
+                    </button>
+                    
+                    <label 
+                      className="btn btn-primary"
+                      style={{ 
+                        minHeight: '44px', 
+                        padding: '8px 12px', 
+                        fontSize: '0.85rem',
+                        margin: 0,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Importar Datos
+                      <input 
+                        type="file" 
+                        accept=".json" 
+                        onChange={handleImportBackup} 
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
                 {/* Botón de Cerrar Sesión */}
                 <button 
                   className="btn btn-secondary btn-full" 
@@ -1188,27 +1299,86 @@ function App() {
 
       {/* Modal Lightbox para Ampliar Documentos Adjuntos */}
       {lightboxImage && (
-        <div className="lightbox-backdrop" onClick={() => setLightboxImage(null)}>
+        <div className="lightbox-backdrop" onClick={closeLightbox}>
           <button 
             className="lightbox-close" 
-            onClick={() => setLightboxImage(null)}
+            onClick={closeLightbox}
             aria-label="Cerrar vista"
           >
             <X size={24} />
           </button>
-          
-          <img 
-            src={lightboxImage} 
-            alt="Documentación Médica Ampliada" 
-            className="lightbox-content"
-            onClick={e => e.stopPropagation()} // Evitar cerrar al tocar la imagen
-          />
+
+          {/* Controles de Zoom */}
+          <div 
+            style={{ 
+              display: 'flex', 
+              gap: '12px', 
+              marginBottom: '16px', 
+              zIndex: 1100 
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <button 
+              className="btn btn-secondary" 
+              onClick={handleZoomOut}
+              disabled={zoomScale <= 1}
+              style={{ minHeight: '44px', minWidth: '44px', padding: '0 16px', fontSize: '1.2rem', fontWeight: 'bold' }}
+            >
+              -
+            </button>
+            <button 
+              className="btn btn-secondary" 
+              onClick={handleZoomReset}
+              style={{ minHeight: '44px', padding: '0 16px', fontSize: '0.9rem' }}
+            >
+              100%
+            </button>
+            <button 
+              className="btn btn-secondary" 
+              onClick={handleZoomIn}
+              disabled={zoomScale >= 3}
+              style={{ minHeight: '44px', minWidth: '44px', padding: '0 16px', fontSize: '1.2rem', fontWeight: 'bold' }}
+            >
+              +
+            </button>
+          </div>
+
+          <div 
+            className="lightbox-image-wrapper"
+            style={{
+              maxWidth: '100%',
+              maxHeight: '65vh',
+              overflow: 'auto',
+              width: '100%',
+              borderRadius: '12px',
+              backgroundColor: '#1e293b',
+              display: 'flex',
+              justifyContent: zoomScale === 1 ? 'center' : 'flex-start',
+              alignItems: zoomScale === 1 ? 'center' : 'flex-start',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <img 
+              src={lightboxImage} 
+              alt="Documentación Médica Ampliada" 
+              style={{
+                width: `${100 * zoomScale}%`,
+                maxWidth: zoomScale === 1 ? '100%' : 'none',
+                height: 'auto',
+                maxHeight: zoomScale === 1 ? '65vh' : 'none',
+                objectFit: 'contain',
+                display: 'block',
+                transition: 'width 0.2s ease, max-height 0.2s ease',
+              }}
+            />
+          </div>
 
           <a 
             href={lightboxImage} 
             download={`documento-medico-${Date.now()}`}
             className="lightbox-download"
             onClick={e => e.stopPropagation()}
+            style={{ marginTop: '16px' }}
           >
             <Download size={18} />
             <span>Guardar Foto</span>

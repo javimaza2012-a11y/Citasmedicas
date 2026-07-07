@@ -85,5 +85,12 @@ export const api = {
       console.error('Error subiendo imagen:', error);
       throw error;
     }
-  }
+  },
+
+  // --- Copia de Seguridad ---
+  exportBackup: () => fetchJson('/api/backup/export'),
+  importBackup: (backupData) => fetchJson('/api/backup/import', {
+    method: 'POST',
+    body: JSON.stringify(backupData),
+  })
 };
