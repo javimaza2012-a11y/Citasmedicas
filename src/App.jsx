@@ -147,6 +147,7 @@ function App() {
 
   // Estados de Autenticación
   const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem('family_app_logged') === 'true');
+  const [userRole, setUserRole] = useState(localStorage.getItem('family_app_role') || 'readonly');
   const [loginUser, setLoginUser] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -157,9 +158,22 @@ function App() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    if (loginUser.trim().toLowerCase() === 'luciano' && loginPassword === 'Luciano*1210*+-*') {
+    const userClean = loginUser.trim().toLowerCase();
+    
+    if (userClean === 'luciano' && loginPassword === 'Luciano*1210*+-*') {
       localStorage.setItem('family_app_logged', 'true');
+      localStorage.setItem('family_app_role', 'admin');
       setIsAuthenticated(true);
+      setUserRole('admin');
+      setLoginError('');
+    } else if (
+      (userClean === 'luciano' || userClean === 'carmen') && 
+      loginPassword === '1234'
+    ) {
+      localStorage.setItem('family_app_logged', 'true');
+      localStorage.setItem('family_app_role', 'readonly');
+      setIsAuthenticated(true);
+      setUserRole('readonly');
       setLoginError('');
     } else {
       setLoginError('Usuario o contraseña incorrectos');
@@ -169,7 +183,9 @@ function App() {
   const handleLogout = () => {
     if (window.confirm('¿Seguro que deseas salir de la aplicación?')) {
       localStorage.removeItem('family_app_logged');
+      localStorage.removeItem('family_app_role');
       setIsAuthenticated(false);
+      setUserRole('readonly');
       setLoginUser('');
       setLoginPassword('');
       setShowPassword(false);
@@ -740,7 +756,7 @@ function App() {
             <h1 className="header-title">Agenda Médica</h1>
             <p className="header-subtitle">Calendario familiar compartido</p>
           </div>
-          {activeTab === 'citas' && (
+          {activeTab === 'citas' && userRole === 'admin' && (
             <button 
               className="btn btn-primary btn-icon-only" 
               onClick={() => {
@@ -828,7 +844,7 @@ function App() {
                         ? 'No tienes citas guardadas en el pasado.' 
                         : '¡Excelente! No tienes citas médicas programadas por ahora.'}
                     </p>
-                    {!showPastAppointments && (
+                    {!showPastAppointments && userRole === 'admin' && (
                       <button className="btn btn-primary" onClick={() => { resetAppointmentForm(); setActiveTab('agregar'); }} style={{ marginTop: '12px' }}>
                         Programar Primera Cita
                       </button>
@@ -934,24 +950,26 @@ function App() {
                               </div>
                             )}
 
-                            <div className="appointment-actions">
-                              <button 
-                                className="btn btn-secondary" 
-                                onClick={() => handleEditAppointment(app)}
-                                style={{ minHeight: '40px', padding: '6px 12px', fontSize: '0.85rem', borderRadius: '10px' }}
-                              >
-                                <Edit size={14} />
-                                <span>Editar</span>
-                              </button>
-                              <button 
-                                className="btn btn-danger" 
-                                onClick={() => handleDeleteAppointment(app.id)}
-                                style={{ minHeight: '40px', padding: '6px 12px', fontSize: '0.85rem', borderRadius: '10px' }}
-                              >
-                                <Trash2 size={14} />
-                                <span>Eliminar</span>
-                              </button>
-                            </div>
+                            {userRole === 'admin' && (
+                              <div className="appointment-actions">
+                                <button 
+                                  className="btn btn-secondary" 
+                                  onClick={() => handleEditAppointment(app)}
+                                  style={{ minHeight: '40px', padding: '6px 12px', fontSize: '0.85rem', borderRadius: '10px' }}
+                                >
+                                  <Edit size={14} />
+                                  <span>Editar</span>
+                                </button>
+                                <button 
+                                  className="btn btn-danger" 
+                                  onClick={() => handleDeleteAppointment(app.id)}
+                                  style={{ minHeight: '40px', padding: '6px 12px', fontSize: '0.85rem', borderRadius: '10px' }}
+                                >
+                                  <Trash2 size={14} />
+                                  <span>Eliminar</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </React.Fragment>
                       );
@@ -1378,72 +1396,74 @@ function App() {
                 </h2>
 
                 {/* Formulario Agregar/Editar Paciente */}
-                <div style={{ backgroundColor: 'var(--bg-primary)', padding: '16px', borderRadius: '20px', marginBottom: '24px', border: '1px solid var(--border)' }}>
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {editingPatient ? 'Editar Familiar' : 'Agregar Nuevo Familiar'}
-                  </h3>
-                  
-                  <form onSubmit={handleSavePatient} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div className="form-input-row" style={{ gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <input 
-                        type="text" 
-                        placeholder="Nombre (Ej. Papá)"
-                        value={formPatient.name}
-                        onChange={e => setFormPatient(prev => ({ ...prev, name: e.target.value }))}
-                        className="form-input"
-                        style={{ padding: '10px 12px', fontSize: '0.9rem' }}
-                        required
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Relación (Ej. Suegro)"
-                        value={formPatient.relation}
-                        onChange={e => setFormPatient(prev => ({ ...prev, relation: e.target.value }))}
-                        className="form-input"
-                        style={{ padding: '10px 12px', fontSize: '0.9rem' }}
-                      />
-                    </div>
-
-                    <div>
-                      <span className="form-label" style={{ fontSize: '0.85rem', marginBottom: '6px', display: 'block' }}>
-                        Selecciona un Color Distintivo:
-                      </span>
-                      <div className="color-picker-grid">
-                        {PALETTE_COLORS.map(c => (
-                          <div 
-                            key={c}
-                            className={`color-option ${formPatient.color === c ? 'selected' : ''}`}
-                            style={{ backgroundColor: c }}
-                            onClick={() => setFormPatient(prev => ({ ...prev, color: c }))}
-                          ></div>
-                        ))}
+                {userRole === 'admin' && (
+                  <div style={{ backgroundColor: 'var(--bg-primary)', padding: '16px', borderRadius: '20px', marginBottom: '24px', border: '1px solid var(--border)' }}>
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {editingPatient ? 'Editar Familiar' : 'Agregar Nuevo Familiar'}
+                    </h3>
+                    
+                    <form onSubmit={handleSavePatient} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div className="form-input-row" style={{ gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <input 
+                          type="text" 
+                          placeholder="Nombre (Ej. Papá)"
+                          value={formPatient.name}
+                          onChange={e => setFormPatient(prev => ({ ...prev, name: e.target.value }))}
+                          className="form-input"
+                          style={{ padding: '10px 12px', fontSize: '0.9rem' }}
+                          required
+                        />
+                        <input 
+                          type="text" 
+                          placeholder="Relación (Ej. Suegro)"
+                          value={formPatient.relation}
+                          onChange={e => setFormPatient(prev => ({ ...prev, relation: e.target.value }))}
+                          className="form-input"
+                          style={{ padding: '10px 12px', fontSize: '0.9rem' }}
+                        />
                       </div>
-                    </div>
 
-                    <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
-                      {editingPatient && (
+                      <div>
+                        <span className="form-label" style={{ fontSize: '0.85rem', marginBottom: '6px', display: 'block' }}>
+                          Selecciona un Color Distintivo:
+                        </span>
+                        <div className="color-picker-grid">
+                          {PALETTE_COLORS.map(c => (
+                            <div 
+                              key={c}
+                              className={`color-option ${formPatient.color === c ? 'selected' : ''}`}
+                              style={{ backgroundColor: c }}
+                              onClick={() => setFormPatient(prev => ({ ...prev, color: c }))}
+                            ></div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                        {editingPatient && (
+                          <button 
+                            type="button" 
+                            className="btn btn-secondary" 
+                            onClick={() => {
+                              setEditingPatient(null);
+                              setFormPatient({ name: '', relation: '', color: PALETTE_COLORS[0] });
+                            }}
+                            style={{ minHeight: '40px', padding: '8px 16px', fontSize: '0.85rem', flexGrow: 1 }}
+                          >
+                            Cancelar
+                          </button>
+                        )}
                         <button 
-                          type="button" 
-                          className="btn btn-secondary" 
-                          onClick={() => {
-                            setEditingPatient(null);
-                            setFormPatient({ name: '', relation: '', color: PALETTE_COLORS[0] });
-                          }}
-                          style={{ minHeight: '40px', padding: '8px 16px', fontSize: '0.85rem', flexGrow: 1 }}
+                          type="submit" 
+                          className="btn btn-primary"
+                          style={{ minHeight: '40px', padding: '8px 16px', fontSize: '0.85rem', flexGrow: 2 }}
                         >
-                          Cancelar
+                          {editingPatient ? 'Guardar Cambios' : 'Añadir Familiar'}
                         </button>
-                      )}
-                      <button 
-                        type="submit" 
-                        className="btn btn-primary"
-                        style={{ minHeight: '40px', padding: '8px 16px', fontSize: '0.85rem', flexGrow: 2 }}
-                      >
-                        {editingPatient ? 'Guardar Cambios' : 'Añadir Familiar'}
-                      </button>
-                    </div>
-                  </form>
-                </div>
+                      </div>
+                    </form>
+                  </div>
+                )}
 
                 {/* Listado de Pacientes */}
                 <div className="patient-list">
@@ -1461,75 +1481,79 @@ function App() {
                       
                       {/* Acciones (Editar/Eliminar) */}
                       {/* No permitimos borrar los pacientes iniciales si tienen citas para no romper historial, la validación la hace el backend */}
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button 
-                          className="btn-icon-only" 
-                          onClick={() => handleEditPatient(p)} 
-                          title="Editar nombre/color"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button 
-                          className="btn-icon-only" 
-                          onClick={() => handleDeletePatient(p.id)} 
-                          title="Eliminar miembro"
-                          style={{ color: 'var(--danger)' }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+                      {userRole === 'admin' && (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button 
+                            className="btn-icon-only" 
+                            onClick={() => handleEditPatient(p)} 
+                            title="Editar nombre/color"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button 
+                            className="btn-icon-only" 
+                            onClick={() => handleDeletePatient(p.id)} 
+                            title="Eliminar miembro"
+                            style={{ color: 'var(--danger)' }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
 
                 {/* Copia de Seguridad */}
-                <div style={{ 
-                  backgroundColor: 'var(--bg-primary)', 
-                  padding: '20px', 
-                  borderRadius: '20px', 
-                  marginTop: '24px', 
-                  border: '1px solid var(--border)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px'
-                }}>
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>
-                    Copia de Seguridad
-                  </h3>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-light)', margin: 0 }}>
-                    Descarga una copia de todas las citas y familiares en tu dispositivo para guardarla, o restáurala si has cambiado de móvil.
-                  </p>
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
-                    <button 
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={handleExportBackup}
-                      style={{ minHeight: '44px', padding: '8px 12px', fontSize: '0.85rem' }}
-                    >
-                      Exportar Datos
-                    </button>
+                {userRole === 'admin' && (
+                  <div style={{ 
+                    backgroundColor: 'var(--bg-primary)', 
+                    padding: '20px', 
+                    borderRadius: '20px', 
+                    marginTop: '24px', 
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>
+                      Copia de Seguridad
+                    </h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-light)', margin: 0 }}>
+                      Descarga una copia de todas las citas y familiares en tu dispositivo para guardarla, o restáurala si has cambiado de móvil.
+                    </p>
                     
-                    <label 
-                      className="btn btn-primary"
-                      style={{ 
-                        minHeight: '44px', 
-                        padding: '8px 12px', 
-                        fontSize: '0.85rem',
-                        margin: 0,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Importar Datos
-                      <input 
-                        type="file" 
-                        accept=".json" 
-                        onChange={handleImportBackup} 
-                        style={{ display: 'none' }}
-                      />
-                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
+                      <button 
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={handleExportBackup}
+                        style={{ minHeight: '44px', padding: '8px 12px', fontSize: '0.85rem' }}
+                      >
+                        Exportar Datos
+                      </button>
+                      
+                      <label 
+                        className="btn btn-primary"
+                        style={{ 
+                          minHeight: '44px', 
+                          padding: '8px 12px', 
+                          fontSize: '0.85rem',
+                          margin: 0,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Importar Datos
+                        <input 
+                          type="file" 
+                          accept=".json" 
+                          onChange={handleImportBackup} 
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Botón de Cerrar Sesión */}
                 <button 
@@ -1561,16 +1585,18 @@ function App() {
           <CalendarIcon />
           <span>Calendario</span>
         </button>
-        <button 
-          className={`nav-button ${activeTab === 'agregar' ? 'active' : ''}`}
-          onClick={() => {
-            resetAppointmentForm();
-            setActiveTab('agregar');
-          }}
-        >
-          <Plus />
-          <span>Nueva Cita</span>
-        </button>
+         {userRole === 'admin' && (
+          <button 
+            className={`nav-button ${activeTab === 'agregar' ? 'active' : ''}`}
+            onClick={() => {
+              resetAppointmentForm();
+              setActiveTab('agregar');
+            }}
+          >
+            <Plus />
+            <span>Nueva Cita</span>
+          </button>
+        )}
         <button 
           className={`nav-button ${activeTab === 'pacientes' ? 'active' : ''}`}
           onClick={() => setActiveTab('pacientes')}
